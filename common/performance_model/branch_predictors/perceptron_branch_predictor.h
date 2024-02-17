@@ -10,7 +10,7 @@
 class PerceptronBranchPredictor : public BranchPredictor
 {
 	public:
-		PerceptronBranchPredictor(String name, core_id_t core_id, UInt32 size);
+		PerceptronBranchPredictor(String name, core_id_t core_id);
 		~PerceptronBranchPredictor();
 
 		bool predict(bool indirect, IntPtr ip, IntPtr target);

@@ -3,7 +3,8 @@
 *.o
 *.pyc
 *.a
-
+# pinball file
+pinballs/
 # emacs temp files
 *~
 
