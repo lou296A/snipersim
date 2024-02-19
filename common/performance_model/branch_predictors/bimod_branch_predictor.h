@@ -1,19 +1,18 @@
-#ifndef BIMODAL_TABLE_H
-#define BIMODAL_TABLE_H
-
+#ifndef BIMOD_BRANCH_PREDICTOR_H 
+#define BIMOD_BRANCH_PREDICTOR_H 
 #include <boost/scoped_array.hpp>
 #include "simulator.h"
 #include "branch_predictor.h"
 #include "saturating_predictor.h"
 
-class SimpleBimodalTable :  BranchPredictor
+class BimodBranchPredictor : public BranchPredictor
 {
 
 public:
 
-   SimpleBimodalTable(UInt32 entries)
+   BimodBranchPredictor(String name, core_id_t core_id, UInt32 entries)
       : m_num_entries(entries)
-      , m_table(entries, 0)
+      , m_table(entries, 0), BranchPredictor(name, core_id)
    {
       reset();
       m_mask = 0;
@@ -31,6 +30,7 @@ public:
 
    void update(bool predicted, bool actual, bool indirect, IntPtr ip, IntPtr target)
    {
+      updateCounters(predicted, actual);
       UInt32 index = ip & m_mask;
       if (actual)
       {
