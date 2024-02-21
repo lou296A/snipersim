@@ -31,6 +31,7 @@ public:
 
    void update(bool predicted, bool actual, bool indirect, IntPtr ip, IntPtr target)
    {
+      
       UInt32 index = ip & m_mask;
       if (actual)
       {

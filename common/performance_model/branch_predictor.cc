@@ -4,6 +4,7 @@
 #include "perceptron_branch_predictor.h"
 #include "pentium_m_branch_predictor.h"
 #include "bimod_branch_predictor.h"
+#include "gshare_branch_predictor.h"
 #include "a53branchpredictor.h"
 #include "config.hpp"
 #include "stats.h"
@@ -40,6 +41,11 @@ BranchPredictor* BranchPredictor::create(core_id_t core_id)
 		if (type == "none")
 		{
 			return 0;
+		}
+		else if(type =="gshare"){ 
+			
+			uint32_t entries = cfg->getIntArray("perf_model/branch_predictor/entries", core_id);
+			return new GshareBranchPredictor("branch_predictor", core_id, entries);
 		}
 		else if (type == "one_bit")
 		{

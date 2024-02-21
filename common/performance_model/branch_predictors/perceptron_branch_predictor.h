@@ -1,3 +1,4 @@
+// some portion of the code were inspire by https://github.com/taraeicher/PerceptronBranchPredictor
 #ifndef PERCEPTRON_BRANCH_PREDICTOR_H
 #define PERCEPTRON_BRANCH_PREDICTOR_H
 
