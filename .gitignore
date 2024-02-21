@@ -30,7 +30,7 @@ graphite.out
 cpi-stack.jpg
 output_files
 tools/cpistack-collect/cpistack-*
-
+simout/ 
 # compiled libraries
 lib/libcarbon_sim.a
 lib/pin_sim.so
