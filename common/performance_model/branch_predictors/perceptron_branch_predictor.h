@@ -5,9 +5,9 @@
 #include "branch_predictor.h"
 #include <bitset>
 #include <vector>
-#define HIST_LEN   59 
-#define threshold 127
-#define TABLE_SIZE 1024
+#define HIST_LEN  1 
+#define threshold 512
+#define TABLE_SIZE 4194304
 class PerceptronBranchPredictor : public BranchPredictor
 {
 	public:

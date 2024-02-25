@@ -1,15 +1,15 @@
 Enabled messages [UnixVersion()] 65  info: Informational messages (enabled by default)
-Pinball basename: /home/lou/Documents/snipersim/pinballs/astar/pinball
+Pinball basename: /home/lou/Documents/snipersim/pinballs/bzip2/pinball
 Replaying on 'Linux', recorded on 'Linux'
 Focus thread: 0
-Found VDSO in page 0x7ffda2312000
-NOP sequence address allocated in empty range 0x000424000 
+Found VDSO in page 0x7fff51179000
+NOP sequence address allocated in empty range 0x900001000 
 Preloaded images: 0
 Setting image replay mode in Pin.
-[0] Started Replaying thread OSPid: 12139 OSTid: 12139 PIN tid 0
+[0] Started Replaying thread OSPid: 6933 OSTid: 6933 PIN tid 0
 [0] Restoring initial pages
 [0] Thread replayer initialized
 [0] Mapping stack address, pin tid 0
 [0] All threads were created, ready to replay 
-[0] Restoring Initial checkpoint before PC:0x0004091e0 ctxt: 0x7fd13f18d200
-[0] Replayer ThreadStart Initial IP: 0x0004091e0
+[0] Restoring Initial checkpoint before PC:0x00040149d ctxt: 0x7fd400b81200
+[0] Replayer ThreadStart Initial IP: 0x00040149d

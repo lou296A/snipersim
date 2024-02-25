@@ -1,0 +1,1717 @@
+diff --git a/.gitignore b/.gitignore
+index 75467d2..7e972ac 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -3,8 +3,7 @@
+ *.o
+ *.pyc
+ *.a
+-# pinball file
+-pinballs/
++
+ # emacs temp files
+ *~
+ 
+@@ -30,7 +29,7 @@ graphite.out
+ cpi-stack.jpg
+ output_files
+ tools/cpistack-collect/cpistack-*
+-simout/ 
++
+ # compiled libraries
+ lib/libcarbon_sim.a
+ lib/pin_sim.so
+diff --git a/; b/;
+deleted file mode 100644
+index 4a094b0..0000000
+--- a/;
++++ /dev/null
+@@ -1,14 +0,0 @@
+-#!/bin/bash
+-predictor="gshare" 
+-mkdir -p simout 
+-mkdir -p simout/$predictor
+-./run-sniper -c nehalem-lite -sprogresstrace -s stop-by-icount:1000000000 --pinballs=pinballs/mcf/pinball
+-cat sim.out  > simout/$predictor/mcfout.txt 
+-./run-sniper -c nehalem-lite -sprogresstrace -s stop-by-icount:1000000000 --pinballs=pinballs/bzip2/pinball
+-cat sim.out  > simout/$predictor/bzip2out.txt 
+-./run-sniper -c nehalem-lite -sprogresstrace -s stop-by-icount:100000000 --pinballs=pinballs/gobmk/pinball
+-cat sim.out  > simout/$predictor/gobmk.txt 
+-./run-sniper -c nehalem-lite -sprogresstrace -s stop-by-icount:100000000 --pinballs=pinballs/sjeng/pinball
+-cat sim.out  > simout/$predictor/sjeng.txt 
+-./run-sniper -c nehalem-lite -sprogresstrace -s stop-by-icount:100000000 --pinballs=pinballs/astar/pinball
+-cat sim.out  > simout/$predictor/astar.txt 
+diff --git a/common/performance_model/:q b/common/performance_model/:q
+deleted file mode 100644
+index a8b3b9b..0000000
+--- a/common/performance_model/:q
++++ /dev/null
+@@ -1,92 +0,0 @@
+-#include "simulator.h"
+-#include "branch_predictor.h"
+-#include "one_bit_branch_predictor.h"
+-#include "perceptron_branch_predictor.h"
+-#include "pentium_m_branch_predictor.h"
+-#include "a53branchpredictor.h"
+-#include "config.hpp"
+-#include "stats.h"
+-
+-BranchPredictor::BranchPredictor()
+-	: m_correct_predictions(0)
+-	  , m_incorrect_predictions(0)
+-{
+-}
+-
+-BranchPredictor::BranchPredictor(String name, core_id_t core_id)
+-	: m_correct_predictions(0)
+-	  , m_incorrect_predictions(0)
+-{
+-	registerStatsMetric(name, core_id, "num-correct", &m_correct_predictions);
+-	registerStatsMetric(name, core_id, "num-incorrect", &m_incorrect_predictions);
+-}
+-
+-BranchPredictor::~BranchPredictor()
+-{ }
+-
+-UInt64 BranchPredictor::m_mispredict_penalty;
+-
+-BranchPredictor* BranchPredictor::create(core_id_t core_id)
+-{
+-	try
+-	{
+-		config::Config *cfg = Sim()->getCfg();
+-		assert(cfg);
+-
+-		m_mispredict_penalty = cfg->getIntArray("perf_model/branch_predictor/mispredict_penalty", core_id);
+-
+-		String type = cfg->getStringArray("perf_model/branch_predictor/type", core_id);
+-		if (type == "none")
+-		{
+-			return 0;
+-		}
+-		else if (type == "one_bit")
+-		{
+-			UInt32 size = cfg->getIntArray("perf_model/branch_predictor/size", core_id);
+-			return new OneBitBranchPredictor("branch_predictor", core_id, size);
+-		}
+-		else if (type == "pentium_m")
+-		{
+-			return new PentiumMBranchPredictor("branch_predictor", core_id);
+-		}
+-		else if (type == "a53") {
+-			return new A53BranchPredictor("branch_predictor", core_id);
+-		}
+-		else if (type == "perceptron") {
+-			return new PerceptronBranchPredictor(core_id); 
+-		}
+-		else if (type == "bimod"){	
+-			UInt32 size = cfg->getIntArray("perf_model/branch_predictor/size", core_id);
+-			return new SimpleBimodalTable("branch_predictor", size); 
+-		}
+-		else
+-		{
+-			LOG_PRINT_ERROR("Invalid branch predictor type.");
+-			return 0;
+-		}
+-	}
+-	catch (...)
+-	{
+-		LOG_PRINT_ERROR("Config info not available while constructing branch predictor.");
+-		return 0;
+-	}
+-}
+-
+-UInt64 BranchPredictor::getMispredictPenalty()
+-{
+-	return m_mispredict_penalty;
+-}
+-
+-void BranchPredictor::resetCounters()
+-{
+-	m_correct_predictions = 0;
+-	m_incorrect_predictions = 0;
+-}
+-
+-void BranchPredictor::updateCounters(bool predicted, bool actual)
+-{
+-	if (predicted == actual)
+-		++m_correct_predictions;
+-	else
+-		++m_incorrect_predictions;
+-}
+diff --git a/common/performance_model/branch_predictor.cc b/common/performance_model/branch_predictor.cc
+index 26998aa..ee541fa 100644
+--- a/common/performance_model/branch_predictor.cc
++++ b/common/performance_model/branch_predictor.cc
+@@ -1,26 +1,23 @@
+ #include "simulator.h"
+ #include "branch_predictor.h"
+ #include "one_bit_branch_predictor.h"
+-#include "perceptron_branch_predictor.h"
+ #include "pentium_m_branch_predictor.h"
+-#include "bimod_branch_predictor.h"
+-#include "gshare_branch_predictor.h"
+ #include "a53branchpredictor.h"
+ #include "config.hpp"
+ #include "stats.h"
+ 
+ BranchPredictor::BranchPredictor()
+-	: m_correct_predictions(0)
+-	  , m_incorrect_predictions(0)
++   : m_correct_predictions(0)
++   , m_incorrect_predictions(0)
+ {
+ }
+ 
+ BranchPredictor::BranchPredictor(String name, core_id_t core_id)
+-	: m_correct_predictions(0)
+-	  , m_incorrect_predictions(0)
++   : m_correct_predictions(0)
++   , m_incorrect_predictions(0)
+ {
+-	registerStatsMetric(name, core_id, "num-correct", &m_correct_predictions);
+-	registerStatsMetric(name, core_id, "num-incorrect", &m_incorrect_predictions);
++  registerStatsMetric(name, core_id, "num-correct", &m_correct_predictions);
++  registerStatsMetric(name, core_id, "num-incorrect", &m_incorrect_predictions);
+ }
+ 
+ BranchPredictor::~BranchPredictor()
+@@ -30,70 +27,58 @@ UInt64 BranchPredictor::m_mispredict_penalty;
+ 
+ BranchPredictor* BranchPredictor::create(core_id_t core_id)
+ {
+-	try
+-	{
+-		config::Config *cfg = Sim()->getCfg();
+-		assert(cfg);
++   try
++   {
++      config::Config *cfg = Sim()->getCfg();
++      assert(cfg);
+ 
+-		m_mispredict_penalty = cfg->getIntArray("perf_model/branch_predictor/mispredict_penalty", core_id);
++      m_mispredict_penalty = cfg->getIntArray("perf_model/branch_predictor/mispredict_penalty", core_id);
+ 
+-		String type = cfg->getStringArray("perf_model/branch_predictor/type", core_id);
+-		if (type == "none")
+-		{
+-			return 0;
+-		}
+-		else if(type =="gshare"){ 
+-			
+-			uint32_t entries = cfg->getIntArray("perf_model/branch_predictor/entries", core_id);
+-			return new GshareBranchPredictor("branch_predictor", core_id, entries);
+-		}
+-		else if (type == "one_bit")
+-		{
+-			UInt32 size = cfg->getIntArray("perf_model/branch_predictor/size", core_id);
+-			return new OneBitBranchPredictor("branch_predictor", core_id, size);
+-		}
+-		else if (type == "pentium_m")
+-		{
+-			return new PentiumMBranchPredictor("branch_predictor", core_id);
+-		}
+-		else if (type == "a53") {
+-			return new A53BranchPredictor("branch_predictor", core_id);
+-		}
+-		else if (type == "perceptron") {
+-			return new PerceptronBranchPredictor("branch_predictor", core_id); 
+-		}
+-		else if (type == "bimod"){	
+-			UInt32 size = cfg->getIntArray("perf_model/branch_predictor/size", core_id);
+-			return new BimodBranchPredictor("branch_predictor", core_id, size); 
+-		}
+-		else
+-		{
+-			LOG_PRINT_ERROR("Invalid branch predictor type.");
+-			return 0;
+-		}
+-	}
+-	catch (...)
+-	{
+-		LOG_PRINT_ERROR("Config info not available while constructing branch predictor.");
+-		return 0;
+-	}
++      String type = cfg->getStringArray("perf_model/branch_predictor/type", core_id);
++      if (type == "none")
++      {
++         return 0;
++      }
++      else if (type == "one_bit")
++      {
++         UInt32 size = cfg->getIntArray("perf_model/branch_predictor/size", core_id);
++         return new OneBitBranchPredictor("branch_predictor", core_id, size);
++      }
++      else if (type == "pentium_m")
++      {
++         return new PentiumMBranchPredictor("branch_predictor", core_id);
++      }
++      else if (type == "a53") {
++          return new A53BranchPredictor("branch_predictor", core_id);
++      }
++      else
++      {
++         LOG_PRINT_ERROR("Invalid branch predictor type.");
++         return 0;
++      }
++   }
++   catch (...)
++   {
++      LOG_PRINT_ERROR("Config info not available while constructing branch predictor.");
++      return 0;
++   }
+ }
+ 
+ UInt64 BranchPredictor::getMispredictPenalty()
+ {
+-	return m_mispredict_penalty;
++   return m_mispredict_penalty;
+ }
+ 
+ void BranchPredictor::resetCounters()
+ {
+-	m_correct_predictions = 0;
+-	m_incorrect_predictions = 0;
++  m_correct_predictions = 0;
++  m_incorrect_predictions = 0;
+ }
+ 
+ void BranchPredictor::updateCounters(bool predicted, bool actual)
+ {
+-	if (predicted == actual)
+-		++m_correct_predictions;
+-	else
+-		++m_incorrect_predictions;
++   if (predicted == actual)
++      ++m_correct_predictions;
++   else
++      ++m_incorrect_predictions;
+ }
+diff --git a/common/performance_model/branch_predictors/bimod_branch_predictor.h b/common/performance_model/branch_predictors/bimod_branch_predictor.h
+deleted file mode 100644
+index e5e657e..0000000
+--- a/common/performance_model/branch_predictors/bimod_branch_predictor.h
++++ /dev/null
+@@ -1,70 +0,0 @@
+-#ifndef BIMOD_BRANCH_PREDICTOR_H 
+-#define BIMOD_BRANCH_PREDICTOR_H 
+-#include <boost/scoped_array.hpp>
+-#include "simulator.h"
+-#include "branch_predictor.h"
+-#include "saturating_predictor.h"
+-
+-class BimodBranchPredictor : public BranchPredictor
+-{
+-
+-public:
+-
+-   BimodBranchPredictor(String name, core_id_t core_id, UInt32 entries)
+-      : m_num_entries(entries)
+-      , m_table(entries, 0), BranchPredictor(name, core_id)
+-   {
+-      reset();
+-      m_mask = 0;
+-      for (unsigned int i = 0 ; i < ilog2(m_num_entries) ; i++)
+-      {
+-         m_mask |= (1L<<i);
+-      }
+-   }
+-
+-   bool predict(bool indirect, IntPtr ip, IntPtr target)
+-   {
+-      UInt32 index = ip & m_mask;
+-      return (m_table[index].predict());
+-   }
+-
+-   void update(bool predicted, bool actual, bool indirect, IntPtr ip, IntPtr target)
+-   {
+-      updateCounters(predicted, actual);
+-      UInt32 index = ip & m_mask;
+-      if (actual)
+-      {
+-         ++m_table[index];
+-      }
+-      else
+-      {
+-         --m_table[index];
+-      }
+-   }
+-
+-   void reset()
+-   {
+-      for (unsigned int i = 0 ; i < m_num_entries ; i++) {
+-         m_table[i].reset();
+-      }
+-   }
+-
+-private:
+-
+-   template<typename Addr>
+-   Addr ilog2(Addr n)
+-   {
+-      Addr i;
+-      for(i=0;n>0;n>>=1,i++) {}
+-      return i-1;
+-   }
+-
+-private:
+-
+-   UInt32 m_num_entries;
+-   IntPtr m_mask;
+-   std::vector<SaturatingPredictor<2> > m_table;
+-
+-};
+-
+-#endif /* BIMODAL_TABLE_H */
+diff --git a/common/performance_model/branch_predictors/gshare_branch_predictor.h b/common/performance_model/branch_predictors/gshare_branch_predictor.h
+deleted file mode 100644
+index 2bc33ff..0000000
+--- a/common/performance_model/branch_predictors/gshare_branch_predictor.h
++++ /dev/null
+@@ -1,88 +0,0 @@
+-#ifndef GSHARE_BRANCH_PREDICTOR_H 
+-#define GSHARE_BRANCH_PREDICTOR_H 
+-#include <boost/scoped_array.hpp>
+-#include "simulator.h"
+-#include "branch_predictor.h"
+-#include "saturating_predictor.h"
+-
+-class GshareBranchPredictor : public BranchPredictor
+-{
+-
+-public:
+-
+-   GshareBranchPredictor(String name, core_id_t core_id, UInt32 entries)
+-      : m_num_entries(entries)
+-      , m_table(entries, 0), BranchPredictor(name, core_id)
+-   {
+-      reset();
+-      uint32_t hist_len = ilog2(m_num_entries);  
+-      m_mask = 0;
+-      m_mask = (1 << hist_len) - 1;
+-   }
+-
+-    bool predict(bool indirect, IntPtr ip, IntPtr target) 
+-   {
+-      uint32_t index;  
+-      gen_index(ip, index); 
+-      return (m_table[index].predict());
+-   }
+-
+-   void update(bool predicted, bool actual, bool indirect, IntPtr ip, IntPtr target)
+-   {
+-      updateCounters(predicted, actual);
+-      UInt32 index; 
+-      gen_index(ip, index); 
+-      if (actual)
+-      {
+-         ++m_table[index];
+-      }
+-      else
+-      {
+-         --m_table[index];
+-      }
+-      	// update the global history table
+-     update_ghr(actual); 
+-   }
+-
+-   void reset()
+-   {
+-      for (unsigned int i = 0 ; i < m_num_entries ; i++) {
+-         m_table[i].reset();
+-      }
+-   }
+-
+-private:
+-   void gen_index(uint32_t ip, uint32_t& index){ 
+-    //   create a bit mask of lenght n
+-      // extract the first n bit
+-      uint32_t ip_mask = ip & m_mask; 
+-      uint32_t ghr_mask = ghr & m_mask; // should not be needed; 
+-      // XOR them to get the index 
+-      index = ghr_mask ^ ip_mask; 
+-   }
+-
+-   void update_ghr(bool actual){
+-        // Clear the LSB of the number
+-        uint32_t clearedNumber = ghr & 0xFFFFFFFE; // Mask with all bits set except the LSB
+-        // Set the LSB to the specified bit value
+-        ghr = clearedNumber | static_cast<uint32_t>(actual);
+-    }
+-   
+-   template<typename Addr>
+-   Addr ilog2(Addr n)
+-   {
+-      Addr i;
+-      for(i=0;n>0;n>>=1,i++) {}
+-      return i-1;
+-   }
+-
+-private:
+-
+-   uint32_t m_num_entries;
+-   IntPtr m_mask; 
+-   uint32_t ghr;
+-   std::vector<SaturatingPredictor<2>> m_table;
+-
+-};
+-
+-#endif /* BIMODAL_TABLE_H */
+diff --git a/common/performance_model/branch_predictors/perceptron_branch_predictor.cc b/common/performance_model/branch_predictors/perceptron_branch_predictor.cc
+deleted file mode 100644
+index 248086b..0000000
+--- a/common/performance_model/branch_predictors/perceptron_branch_predictor.cc
++++ /dev/null
+@@ -1,69 +0,0 @@
+-// this is perceptron branch predictor
+-
+-#include "simulator.h"
+-#include "perceptron_branch_predictor.h"
+-
+-PerceptronBranchPredictor::PerceptronBranchPredictor(String name, core_id_t core_id)
+-	: BranchPredictor(name, core_id)
+-
+-{
+-	// perceptronTable=  new int[size][HIST_LEN]; 
+-	yout = 0;
+-	// printf("size %u\n", size); 
+-	for(int  i=0; i < TABLE_SIZE ; i++){
+-		for(int j=0; j < HIST_LEN; j++){
+-			perceptronTable[i][j] = 0;
+-		}
+-	}
+-}
+-
+-PerceptronBranchPredictor::~PerceptronBranchPredictor()
+-{
+-}
+-
+-bool PerceptronBranchPredictor::predict(bool indirect, IntPtr ip, IntPtr target)
+-{
+-	//reset the prediction
+-	int perceptronIndex = ip % TABLE_SIZE;
+-	int prediction = 0;
+-	prediction = perceptronTable[perceptronIndex][0];
+-	for(int i=1; i < HIST_LEN + 1; i++){
+-		if(ghr[i - 1] == 1){
+-			prediction += perceptronTable[perceptronIndex][i];   
+-		}
+-		else{
+-			prediction -= perceptronTable[perceptronIndex][i]; 
+-		}
+-	}
+-	yout = abs(prediction); 
+-
+-	if(prediction >= 0)
+-		return 1; 
+-	return 0; 
+-
+-}
+-
+-void PerceptronBranchPredictor::update(bool predicted, bool actual, bool indirect, IntPtr ip, IntPtr target)
+-{
+-	// for performance analysis
+-	updateCounters(predicted, actual);       
+-	//update the perceptron weight
+-	int t ;
+-	if(actual == 0){
+-		t = -1; 
+-	}
+-	else {
+-		t = 1; 
+-	}
+-	int perceptronIndex = ip % TABLE_SIZE; 	
+-	if((predicted != actual) || yout <= threshold){
+-		perceptronTable[perceptronIndex][0] = perceptronTable[perceptronIndex][0] + t;
+-		for(int i = 1; i < HIST_LEN + 1; i++){
+-			perceptronTable[perceptronIndex][i] = perceptronTable[perceptronIndex][i] + t  * ghr[i-1];
+-		}
+-	}	
+-	// update the global history table
+-	ghr = (ghr << 1);
+-	ghr.set(0, t); 
+-	
+-}
+diff --git a/common/performance_model/branch_predictors/perceptron_branch_predictor.h b/common/performance_model/branch_predictors/perceptron_branch_predictor.h
+deleted file mode 100644
+index e82ab13..0000000
+--- a/common/performance_model/branch_predictors/perceptron_branch_predictor.h
++++ /dev/null
+@@ -1,26 +0,0 @@
+-// some portion of the code were inspire by https://github.com/taraeicher/PerceptronBranchPredictor
+-#ifndef PERCEPTRON_BRANCH_PREDICTOR_H
+-#define PERCEPTRON_BRANCH_PREDICTOR_H
+-
+-#include "branch_predictor.h"
+-#include <bitset>
+-#include <vector>
+-#define HIST_LEN   59 
+-#define threshold 127
+-#define TABLE_SIZE 1024
+-class PerceptronBranchPredictor : public BranchPredictor
+-{
+-	public:
+-		PerceptronBranchPredictor(String name, core_id_t core_id);
+-		~PerceptronBranchPredictor();
+-
+-		bool predict(bool indirect, IntPtr ip, IntPtr target);
+-		void update(bool predicted, bool actual, bool indirect, IntPtr ip, IntPtr target);
+-
+-	private:
+-		int yout;
+-		std::bitset<HIST_LEN> ghr;   
+-		int perceptronTable[TABLE_SIZE][HIST_LEN+1];
+-};
+-
+-#endif
+diff --git a/common/performance_model/branch_predictors/simple_bimodal_table.h b/common/performance_model/branch_predictors/simple_bimodal_table.h
+index f40ce70..e3e4732 100644
+--- a/common/performance_model/branch_predictors/simple_bimodal_table.h
++++ b/common/performance_model/branch_predictors/simple_bimodal_table.h
+@@ -6,7 +6,7 @@
+ #include "branch_predictor.h"
+ #include "saturating_predictor.h"
+ 
+-class SimpleBimodalTable :  BranchPredictor
++class SimpleBimodalTable : BranchPredictor
+ {
+ 
+ public:
+@@ -31,7 +31,6 @@ public:
+ 
+    void update(bool predicted, bool actual, bool indirect, IntPtr ip, IntPtr target)
+    {
+-      
+       UInt32 index = ip & m_mask;
+       if (actual)
+       {
+diff --git a/config/nehalem-lite.cfg b/config/nehalem-lite.cfg
+index 80dfaaa..67775de 100644
+--- a/config/nehalem-lite.cfg
++++ b/config/nehalem-lite.cfg
+@@ -6,11 +6,3 @@ enable_icache_modeling = false
+ 
+ [caching_protocol]
+ type = fast_nehalem
+-
+-
+-[perf_model/branch_predictor]
+-type="gshare" 
+-size=1024
+-entries=65536
+-mispredict_penalty=14
+-
+diff --git a/execute.sh b/execute.sh
+deleted file mode 100755
+index 4a094b0..0000000
+--- a/execute.sh
++++ /dev/null
+@@ -1,14 +0,0 @@
+-#!/bin/bash
+-predictor="gshare" 
+-mkdir -p simout 
+-mkdir -p simout/$predictor
+-./run-sniper -c nehalem-lite -sprogresstrace -s stop-by-icount:1000000000 --pinballs=pinballs/mcf/pinball
+-cat sim.out  > simout/$predictor/mcfout.txt 
+-./run-sniper -c nehalem-lite -sprogresstrace -s stop-by-icount:1000000000 --pinballs=pinballs/bzip2/pinball
+-cat sim.out  > simout/$predictor/bzip2out.txt 
+-./run-sniper -c nehalem-lite -sprogresstrace -s stop-by-icount:100000000 --pinballs=pinballs/gobmk/pinball
+-cat sim.out  > simout/$predictor/gobmk.txt 
+-./run-sniper -c nehalem-lite -sprogresstrace -s stop-by-icount:100000000 --pinballs=pinballs/sjeng/pinball
+-cat sim.out  > simout/$predictor/sjeng.txt 
+-./run-sniper -c nehalem-lite -sprogresstrace -s stop-by-icount:100000000 --pinballs=pinballs/astar/pinball
+-cat sim.out  > simout/$predictor/astar.txt 
+diff --git a/pinball_replay.app0.txt b/pinball_replay.app0.txt
+deleted file mode 100644
+index e5c9fe8..0000000
+--- a/pinball_replay.app0.txt
++++ /dev/null
+@@ -1,15 +0,0 @@
+-Enabled messages [UnixVersion()] 65  info: Informational messages (enabled by default)
+-Pinball basename: /home/lou/Documents/snipersim/pinballs/astar/pinball
+-Replaying on 'Linux', recorded on 'Linux'
+-Focus thread: 0
+-Found VDSO in page 0x7ffda2312000
+-NOP sequence address allocated in empty range 0x000424000 
+-Preloaded images: 0
+-Setting image replay mode in Pin.
+-[0] Started Replaying thread OSPid: 12139 OSTid: 12139 PIN tid 0
+-[0] Restoring initial pages
+-[0] Thread replayer initialized
+-[0] Mapping stack address, pin tid 0
+-[0] All threads were created, ready to replay 
+-[0] Restoring Initial checkpoint before PC:0x0004091e0 ctxt: 0x7fd13f18d200
+-[0] Replayer ThreadStart Initial IP: 0x0004091e0
+diff --git a/pinball_result.app0.result_play b/pinball_result.app0.result_play
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/sim.scripts.py b/sim.scripts.py
+deleted file mode 100644
+index bb0588c..0000000
+--- a/sim.scripts.py
++++ /dev/null
+@@ -1,5 +0,0 @@
+-import sys
+-sys.argv = [ "/home/lou/Documents/snipersim/scripts/progresstrace.py", "" ]
+-execfile("/home/lou/Documents/snipersim/scripts/progresstrace.py")
+-sys.argv = [ "/home/lou/Documents/snipersim/scripts/stop-by-icount.py", "1000000" ]
+-execfile("/home/lou/Documents/snipersim/scripts/stop-by-icount.py")
+diff --git a/simout/astar.txt b/simout/astar.txt
+deleted file mode 100644
+index 0632501..0000000
+--- a/simout/astar.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0    
+-  Instructions                     |    3932108
+-  Cycles                           |   18316452
+-  IPC                              |       0.21
+-  Time (ns)                        |    6885884
+-  Idle time (ns)                   |      -4423
+-  Idle time (%)                    |      -0.1%
+-Branch predictor stats             |           
+-  num correct                      |     407577
+-  num incorrect                    |      69431
+-  misprediction rate               |     14.56%
+-  mpki                             |      17.66
+-TLB Summary                        |           
+-Cache Summary                      |           
+-  Cache L1-I                       |           
+-    num cache accesses             |          0
+-    num cache misses               |          0
+-    miss rate                      |       inf%
+-    mpki                           |       0.00
+-  Cache L1-D                       |           
+-    num cache accesses             |    2365339
+-    num cache misses               |     146305
+-    miss rate                      |      6.19%
+-    mpki                           |      37.21
+-  Cache L2                         |           
+-    num cache accesses             |     146305
+-    num cache misses               |      86951
+-    miss rate                      |     59.43%
+-    mpki                           |      22.11
+-  Cache L3                         |           
+-    num cache accesses             |      86951
+-    num cache misses               |      85623
+-    miss rate                      |     98.47%
+-    mpki                           |      21.78
+-DRAM summary                       |           
+-  num dram accesses                |      85623
+-  average dram access latency (ns) |      56.39
+-  average dram queueing delay      |       0.00
+diff --git a/simout/bimod/astar.txt b/simout/bimod/astar.txt
+deleted file mode 100644
+index 5cf1d9f..0000000
+--- a/simout/bimod/astar.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0    
+-  Instructions                     |    3932108
+-  Cycles                           |   18389840
+-  IPC                              |       0.21
+-  Time (ns)                        |    6913474
+-  Idle time (ns)                   |      -4444
+-  Idle time (%)                    |      -0.1%
+-Branch predictor stats             |           
+-  num correct                      |     402331
+-  num incorrect                    |      74677
+-  misprediction rate               |     15.66%
+-  mpki                             |      18.99
+-TLB Summary                        |           
+-Cache Summary                      |           
+-  Cache L1-I                       |           
+-    num cache accesses             |          0
+-    num cache misses               |          0
+-    miss rate                      |       inf%
+-    mpki                           |       0.00
+-  Cache L1-D                       |           
+-    num cache accesses             |    2365339
+-    num cache misses               |     146305
+-    miss rate                      |      6.19%
+-    mpki                           |      37.21
+-  Cache L2                         |           
+-    num cache accesses             |     146305
+-    num cache misses               |      86951
+-    miss rate                      |     59.43%
+-    mpki                           |      22.11
+-  Cache L3                         |           
+-    num cache accesses             |      86951
+-    num cache misses               |      85623
+-    miss rate                      |     98.47%
+-    mpki                           |      21.78
+-DRAM summary                       |           
+-  num dram accesses                |      85623
+-  average dram access latency (ns) |      56.39
+-  average dram queueing delay      |       0.00
+diff --git a/simout/bimod/bzip2out.txt b/simout/bimod/bzip2out.txt
+deleted file mode 100644
+index e69ef7d..0000000
+--- a/simout/bimod/bzip2out.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0     
+-  Instructions                     |  1000000003
+-  Cycles                           |  1538125679
+-  IPC                              |        0.65
+-  Time (ns)                        |   578242737
+-  Idle time (ns)                   |        -159
+-  Idle time (%)                    |       -0.0%
+-Branch predictor stats             |            
+-  num correct                      |   114263619
+-  num incorrect                    |    13250357
+-  misprediction rate               |      10.39%
+-  mpki                             |       13.25
+-TLB Summary                        |            
+-Cache Summary                      |            
+-  Cache L1-I                       |            
+-    num cache accesses             |           0
+-    num cache misses               |           0
+-    miss rate                      |        inf%
+-    mpki                           |        0.00
+-  Cache L1-D                       |            
+-    num cache accesses             |   484819063
+-    num cache misses               |    14039182
+-    miss rate                      |       2.90%
+-    mpki                           |       14.04
+-  Cache L2                         |            
+-    num cache accesses             |    14039182
+-    num cache misses               |     8081214
+-    miss rate                      |      57.56%
+-    mpki                           |        8.08
+-  Cache L3                         |            
+-    num cache accesses             |     8081214
+-    num cache misses               |      140525
+-    miss rate                      |       1.74%
+-    mpki                           |        0.14
+-DRAM summary                       |            
+-  num dram accesses                |      140525
+-  average dram access latency (ns) |       56.39
+-  average dram queueing delay      |        0.00
+diff --git a/simout/bimod/gobmk.txt b/simout/bimod/gobmk.txt
+deleted file mode 100644
+index 14476cf..0000000
+--- a/simout/bimod/gobmk.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0    
+-  Instructions                     |  100000001
+-  Cycles                           |  139976603
+-  IPC                              |       0.71
+-  Time (ns)                        |   52622783
+-  Idle time (ns)                   |       -494
+-  Idle time (%)                    |      -0.0%
+-Branch predictor stats             |           
+-  num correct                      |   11284464
+-  num incorrect                    |    2566997
+-  misprediction rate               |     18.53%
+-  mpki                             |      25.67
+-TLB Summary                        |           
+-Cache Summary                      |           
+-  Cache L1-I                       |           
+-    num cache accesses             |          0
+-    num cache misses               |          0
+-    miss rate                      |       inf%
+-    mpki                           |       0.00
+-  Cache L1-D                       |           
+-    num cache accesses             |   43190698
+-    num cache misses               |     289620
+-    miss rate                      |      0.67%
+-    mpki                           |       2.90
+-  Cache L2                         |           
+-    num cache accesses             |     289620
+-    num cache misses               |      10416
+-    miss rate                      |      3.60%
+-    mpki                           |       0.10
+-  Cache L3                         |           
+-    num cache accesses             |      10416
+-    num cache misses               |      10112
+-    miss rate                      |     97.08%
+-    mpki                           |       0.10
+-DRAM summary                       |           
+-  num dram accesses                |      10112
+-  average dram access latency (ns) |      56.39
+-  average dram queueing delay      |       0.00
+diff --git a/simout/bimod/mcfout.txt b/simout/bimod/mcfout.txt
+deleted file mode 100644
+index 35fb556..0000000
+--- a/simout/bimod/mcfout.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0      
+-  Instructions                     |   1000000001
+-  Cycles                           |  10036600303
+-  IPC                              |         0.10
+-  Time (ns)                        |   3773158009
+-  Idle time (ns)                   |        -3384
+-  Idle time (%)                    |        -0.0%
+-Branch predictor stats             |             
+-  num correct                      |    190202338
+-  num incorrect                    |     30703412
+-  misprediction rate               |       13.90%
+-  mpki                             |        30.70
+-TLB Summary                        |             
+-Cache Summary                      |             
+-  Cache L1-I                       |             
+-    num cache accesses             |            0
+-    num cache misses               |            0
+-    miss rate                      |         inf%
+-    mpki                           |         0.00
+-  Cache L1-D                       |             
+-    num cache accesses             |    413326688
+-    num cache misses               |    116125832
+-    miss rate                      |       28.10%
+-    mpki                           |       116.13
+-  Cache L2                         |             
+-    num cache accesses             |    116125832
+-    num cache misses               |     86797910
+-    miss rate                      |       74.74%
+-    mpki                           |        86.80
+-  Cache L3                         |             
+-    num cache accesses             |     86797910
+-    num cache misses               |     46129618
+-    miss rate                      |       53.15%
+-    mpki                           |        46.13
+-DRAM summary                       |             
+-  num dram accesses                |     46129618
+-  average dram access latency (ns) |        56.39
+-  average dram queueing delay      |         0.00
+diff --git a/simout/bimod/sjeng.txt b/simout/bimod/sjeng.txt
+deleted file mode 100644
+index 0c44a11..0000000
+--- a/simout/bimod/sjeng.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0    
+-  Instructions                     |  100000001
+-  Cycles                           |  142086823
+-  IPC                              |       0.70
+-  Time (ns)                        |   53416099
+-  Idle time (ns)                   |       -415
+-  Idle time (%)                    |      -0.0%
+-Branch predictor stats             |           
+-  num correct                      |   14846313
+-  num incorrect                    |    2623551
+-  misprediction rate               |     15.02%
+-  mpki                             |      26.24
+-TLB Summary                        |           
+-Cache Summary                      |           
+-  Cache L1-I                       |           
+-    num cache accesses             |          0
+-    num cache misses               |          0
+-    miss rate                      |       inf%
+-    mpki                           |       0.00
+-  Cache L1-D                       |           
+-    num cache accesses             |   31535255
+-    num cache misses               |     112536
+-    miss rate                      |      0.36%
+-    mpki                           |       1.13
+-  Cache L2                         |           
+-    num cache accesses             |     112536
+-    num cache misses               |      32951
+-    miss rate                      |     29.28%
+-    mpki                           |       0.33
+-  Cache L3                         |           
+-    num cache accesses             |      32951
+-    num cache misses               |      30339
+-    miss rate                      |     92.07%
+-    mpki                           |       0.30
+-DRAM summary                       |           
+-  num dram accesses                |      30339
+-  average dram access latency (ns) |      56.39
+-  average dram queueing delay      |       0.00
+diff --git a/simout/gshare/astar.txt b/simout/gshare/astar.txt
+deleted file mode 100644
+index 5b41a51..0000000
+--- a/simout/gshare/astar.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0    
+-  Instructions                     |    3932108
+-  Cycles                           |   18387656
+-  IPC                              |       0.21
+-  Time (ns)                        |    6912653
+-  Idle time (ns)                   |      -4438
+-  Idle time (%)                    |      -0.1%
+-Branch predictor stats             |           
+-  num correct                      |     402488
+-  num incorrect                    |      74520
+-  misprediction rate               |     15.62%
+-  mpki                             |      18.95
+-TLB Summary                        |           
+-Cache Summary                      |           
+-  Cache L1-I                       |           
+-    num cache accesses             |          0
+-    num cache misses               |          0
+-    miss rate                      |       inf%
+-    mpki                           |       0.00
+-  Cache L1-D                       |           
+-    num cache accesses             |    2365339
+-    num cache misses               |     146305
+-    miss rate                      |      6.19%
+-    mpki                           |      37.21
+-  Cache L2                         |           
+-    num cache accesses             |     146305
+-    num cache misses               |      86951
+-    miss rate                      |     59.43%
+-    mpki                           |      22.11
+-  Cache L3                         |           
+-    num cache accesses             |      86951
+-    num cache misses               |      85623
+-    miss rate                      |     98.47%
+-    mpki                           |      21.78
+-DRAM summary                       |           
+-  num dram accesses                |      85623
+-  average dram access latency (ns) |      56.39
+-  average dram queueing delay      |       0.00
+diff --git a/simout/gshare/bzip2out.txt b/simout/gshare/bzip2out.txt
+deleted file mode 100644
+index 471a0bc..0000000
+--- a/simout/gshare/bzip2out.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0     
+-  Instructions                     |  1000000003
+-  Cycles                           |  1531702102
+-  IPC                              |        0.65
+-  Time (ns)                        |   575827858
+-  Idle time (ns)                   |        -159
+-  Idle time (%)                    |       -0.0%
+-Branch predictor stats             |            
+-  num correct                      |   114722447
+-  num incorrect                    |    12791529
+-  misprediction rate               |      10.03%
+-  mpki                             |       12.79
+-TLB Summary                        |            
+-Cache Summary                      |            
+-  Cache L1-I                       |            
+-    num cache accesses             |           0
+-    num cache misses               |           0
+-    miss rate                      |        inf%
+-    mpki                           |        0.00
+-  Cache L1-D                       |            
+-    num cache accesses             |   484819063
+-    num cache misses               |    14039182
+-    miss rate                      |       2.90%
+-    mpki                           |       14.04
+-  Cache L2                         |            
+-    num cache accesses             |    14039182
+-    num cache misses               |     8081214
+-    miss rate                      |      57.56%
+-    mpki                           |        8.08
+-  Cache L3                         |            
+-    num cache accesses             |     8081214
+-    num cache misses               |      140525
+-    miss rate                      |       1.74%
+-    mpki                           |        0.14
+-DRAM summary                       |            
+-  num dram accesses                |      140525
+-  average dram access latency (ns) |       56.39
+-  average dram queueing delay      |        0.00
+diff --git a/simout/gshare/gobmk.txt b/simout/gshare/gobmk.txt
+deleted file mode 100644
+index e70a940..0000000
+--- a/simout/gshare/gobmk.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0    
+-  Instructions                     |  100000001
+-  Cycles                           |  131933719
+-  IPC                              |       0.76
+-  Time (ns)                        |   49599143
+-  Idle time (ns)                   |       -473
+-  Idle time (%)                    |      -0.0%
+-Branch predictor stats             |           
+-  num correct                      |   11858961
+-  num incorrect                    |    1992500
+-  misprediction rate               |     14.38%
+-  mpki                             |      19.92
+-TLB Summary                        |           
+-Cache Summary                      |           
+-  Cache L1-I                       |           
+-    num cache accesses             |          0
+-    num cache misses               |          0
+-    miss rate                      |       inf%
+-    mpki                           |       0.00
+-  Cache L1-D                       |           
+-    num cache accesses             |   43190698
+-    num cache misses               |     289620
+-    miss rate                      |      0.67%
+-    mpki                           |       2.90
+-  Cache L2                         |           
+-    num cache accesses             |     289620
+-    num cache misses               |      10416
+-    miss rate                      |      3.60%
+-    mpki                           |       0.10
+-  Cache L3                         |           
+-    num cache accesses             |      10416
+-    num cache misses               |      10112
+-    miss rate                      |     97.08%
+-    mpki                           |       0.10
+-DRAM summary                       |           
+-  num dram accesses                |      10112
+-  average dram access latency (ns) |      56.39
+-  average dram queueing delay      |       0.00
+diff --git a/simout/gshare/mcfout.txt b/simout/gshare/mcfout.txt
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/simout/gshare/sjeng.txt b/simout/gshare/sjeng.txt
+deleted file mode 100644
+index d0ca11b..0000000
+--- a/simout/gshare/sjeng.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0    
+-  Instructions                     |  100000001
+-  Cycles                           |  136083553
+-  IPC                              |       0.73
+-  Time (ns)                        |   51159231
+-  Idle time (ns)                   |       -363
+-  Idle time (%)                    |      -0.0%
+-Branch predictor stats             |           
+-  num correct                      |   15275129
+-  num incorrect                    |    2194735
+-  misprediction rate               |     12.56%
+-  mpki                             |      21.95
+-TLB Summary                        |           
+-Cache Summary                      |           
+-  Cache L1-I                       |           
+-    num cache accesses             |          0
+-    num cache misses               |          0
+-    miss rate                      |       inf%
+-    mpki                           |       0.00
+-  Cache L1-D                       |           
+-    num cache accesses             |   31535255
+-    num cache misses               |     112536
+-    miss rate                      |      0.36%
+-    mpki                           |       1.13
+-  Cache L2                         |           
+-    num cache accesses             |     112536
+-    num cache misses               |      32951
+-    miss rate                      |     29.28%
+-    mpki                           |       0.33
+-  Cache L3                         |           
+-    num cache accesses             |      32951
+-    num cache misses               |      30339
+-    miss rate                      |     92.07%
+-    mpki                           |       0.30
+-DRAM summary                       |           
+-  num dram accesses                |      30339
+-  average dram access latency (ns) |      56.39
+-  average dram queueing delay      |       0.00
+diff --git a/simout/mcfout.txt b/simout/mcfout.txt
+deleted file mode 100644
+index 5b41a51..0000000
+--- a/simout/mcfout.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0    
+-  Instructions                     |    3932108
+-  Cycles                           |   18387656
+-  IPC                              |       0.21
+-  Time (ns)                        |    6912653
+-  Idle time (ns)                   |      -4438
+-  Idle time (%)                    |      -0.1%
+-Branch predictor stats             |           
+-  num correct                      |     402488
+-  num incorrect                    |      74520
+-  misprediction rate               |     15.62%
+-  mpki                             |      18.95
+-TLB Summary                        |           
+-Cache Summary                      |           
+-  Cache L1-I                       |           
+-    num cache accesses             |          0
+-    num cache misses               |          0
+-    miss rate                      |       inf%
+-    mpki                           |       0.00
+-  Cache L1-D                       |           
+-    num cache accesses             |    2365339
+-    num cache misses               |     146305
+-    miss rate                      |      6.19%
+-    mpki                           |      37.21
+-  Cache L2                         |           
+-    num cache accesses             |     146305
+-    num cache misses               |      86951
+-    miss rate                      |     59.43%
+-    mpki                           |      22.11
+-  Cache L3                         |           
+-    num cache accesses             |      86951
+-    num cache misses               |      85623
+-    miss rate                      |     98.47%
+-    mpki                           |      21.78
+-DRAM summary                       |           
+-  num dram accesses                |      85623
+-  average dram access latency (ns) |      56.39
+-  average dram queueing delay      |       0.00
+diff --git a/simout/one_bit/astar.txt b/simout/one_bit/astar.txt
+deleted file mode 100644
+index c5fbb6c..0000000
+--- a/simout/one_bit/astar.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0    
+-  Instructions                     |    3932108
+-  Cycles                           |   19019979
+-  IPC                              |       0.21
+-  Time (ns)                        |    7150368
+-  Idle time (ns)                   |      -4623
+-  Idle time (%)                    |      -0.1%
+-Branch predictor stats             |           
+-  num correct                      |     357287
+-  num incorrect                    |     119721
+-  misprediction rate               |     25.10%
+-  mpki                             |      30.45
+-TLB Summary                        |           
+-Cache Summary                      |           
+-  Cache L1-I                       |           
+-    num cache accesses             |          0
+-    num cache misses               |          0
+-    miss rate                      |       inf%
+-    mpki                           |       0.00
+-  Cache L1-D                       |           
+-    num cache accesses             |    2365339
+-    num cache misses               |     146305
+-    miss rate                      |      6.19%
+-    mpki                           |      37.21
+-  Cache L2                         |           
+-    num cache accesses             |     146305
+-    num cache misses               |      86951
+-    miss rate                      |     59.43%
+-    mpki                           |      22.11
+-  Cache L3                         |           
+-    num cache accesses             |      86951
+-    num cache misses               |      85623
+-    miss rate                      |     98.47%
+-    mpki                           |      21.78
+-DRAM summary                       |           
+-  num dram accesses                |      85623
+-  average dram access latency (ns) |      56.39
+-  average dram queueing delay      |       0.00
+diff --git a/simout/one_bit/bzip2out.txt b/simout/one_bit/bzip2out.txt
+deleted file mode 100644
+index 4cedf8c..0000000
+--- a/simout/one_bit/bzip2out.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0     
+-  Instructions                     |  1000000003
+-  Cycles                           |  1563132101
+-  IPC                              |        0.64
+-  Time (ns)                        |   587643647
+-  Idle time (ns)                   |        -164
+-  Idle time (%)                    |       -0.0%
+-Branch predictor stats             |            
+-  num correct                      |   112477441
+-  num incorrect                    |    15036535
+-  misprediction rate               |      11.79%
+-  mpki                             |       15.04
+-TLB Summary                        |            
+-Cache Summary                      |            
+-  Cache L1-I                       |            
+-    num cache accesses             |           0
+-    num cache misses               |           0
+-    miss rate                      |        inf%
+-    mpki                           |        0.00
+-  Cache L1-D                       |            
+-    num cache accesses             |   484819063
+-    num cache misses               |    14039182
+-    miss rate                      |       2.90%
+-    mpki                           |       14.04
+-  Cache L2                         |            
+-    num cache accesses             |    14039182
+-    num cache misses               |     8081214
+-    miss rate                      |      57.56%
+-    mpki                           |        8.08
+-  Cache L3                         |            
+-    num cache accesses             |     8081214
+-    num cache misses               |      140525
+-    miss rate                      |       1.74%
+-    mpki                           |        0.14
+-DRAM summary                       |            
+-  num dram accesses                |      140525
+-  average dram access latency (ns) |       56.39
+-  average dram queueing delay      |        0.00
+diff --git a/simout/one_bit/gobmk.txt b/simout/one_bit/gobmk.txt
+deleted file mode 100644
+index 31c7581..0000000
+--- a/simout/one_bit/gobmk.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0    
+-  Instructions                     |  100000001
+-  Cycles                           |  147356154
+-  IPC                              |       0.68
+-  Time (ns)                        |   55397051
+-  Idle time (ns)                   |       -489
+-  Idle time (%)                    |      -0.0%
+-Branch predictor stats             |           
+-  num correct                      |   10757353
+-  num incorrect                    |    3094108
+-  misprediction rate               |     22.34%
+-  mpki                             |      30.94
+-TLB Summary                        |           
+-Cache Summary                      |           
+-  Cache L1-I                       |           
+-    num cache accesses             |          0
+-    num cache misses               |          0
+-    miss rate                      |       inf%
+-    mpki                           |       0.00
+-  Cache L1-D                       |           
+-    num cache accesses             |   43190698
+-    num cache misses               |     289620
+-    miss rate                      |      0.67%
+-    mpki                           |       2.90
+-  Cache L2                         |           
+-    num cache accesses             |     289620
+-    num cache misses               |      10416
+-    miss rate                      |      3.60%
+-    mpki                           |       0.10
+-  Cache L3                         |           
+-    num cache accesses             |      10416
+-    num cache misses               |      10112
+-    miss rate                      |     97.08%
+-    mpki                           |       0.10
+-DRAM summary                       |           
+-  num dram accesses                |      10112
+-  average dram access latency (ns) |      56.39
+-  average dram queueing delay      |       0.00
+diff --git a/simout/one_bit/mcfout.txt b/simout/one_bit/mcfout.txt
+deleted file mode 100644
+index 8eee271..0000000
+--- a/simout/one_bit/mcfout.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0      
+-  Instructions                     |   1000000001
+-  Cycles                           |  10278771895
+-  IPC                              |         0.10
+-  Time (ns)                        |   3864199961
+-  Idle time (ns)                   |        -3679
+-  Idle time (%)                    |        -0.0%
+-Branch predictor stats             |             
+-  num correct                      |    172904272
+-  num incorrect                    |     48001478
+-  misprediction rate               |       21.73%
+-  mpki                             |        48.00
+-TLB Summary                        |             
+-Cache Summary                      |             
+-  Cache L1-I                       |             
+-    num cache accesses             |            0
+-    num cache misses               |            0
+-    miss rate                      |         inf%
+-    mpki                           |         0.00
+-  Cache L1-D                       |             
+-    num cache accesses             |    413326688
+-    num cache misses               |    116125832
+-    miss rate                      |       28.10%
+-    mpki                           |       116.13
+-  Cache L2                         |             
+-    num cache accesses             |    116125832
+-    num cache misses               |     86797910
+-    miss rate                      |       74.74%
+-    mpki                           |        86.80
+-  Cache L3                         |             
+-    num cache accesses             |     86797910
+-    num cache misses               |     46129618
+-    miss rate                      |       53.15%
+-    mpki                           |        46.13
+-DRAM summary                       |             
+-  num dram accesses                |     46129618
+-  average dram access latency (ns) |        56.39
+-  average dram queueing delay      |         0.00
+diff --git a/simout/one_bit/sjeng.txt b/simout/one_bit/sjeng.txt
+deleted file mode 100644
+index 1fee58d..0000000
+--- a/simout/one_bit/sjeng.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0    
+-  Instructions                     |  100000001
+-  Cycles                           |  152196019
+-  IPC                              |       0.66
+-  Time (ns)                        |   57216549
+-  Idle time (ns)                   |       -442
+-  Idle time (%)                    |      -0.0%
+-Branch predictor stats             |           
+-  num correct                      |   14124221
+-  num incorrect                    |    3345643
+-  misprediction rate               |     19.15%
+-  mpki                             |      33.46
+-TLB Summary                        |           
+-Cache Summary                      |           
+-  Cache L1-I                       |           
+-    num cache accesses             |          0
+-    num cache misses               |          0
+-    miss rate                      |       inf%
+-    mpki                           |       0.00
+-  Cache L1-D                       |           
+-    num cache accesses             |   31535255
+-    num cache misses               |     112536
+-    miss rate                      |      0.36%
+-    mpki                           |       1.13
+-  Cache L2                         |           
+-    num cache accesses             |     112536
+-    num cache misses               |      32951
+-    miss rate                      |     29.28%
+-    mpki                           |       0.33
+-  Cache L3                         |           
+-    num cache accesses             |      32951
+-    num cache misses               |      30339
+-    miss rate                      |     92.07%
+-    mpki                           |       0.30
+-DRAM summary                       |           
+-  num dram accesses                |      30339
+-  average dram access latency (ns) |      56.39
+-  average dram queueing delay      |       0.00
+diff --git a/simout/pentium_m/astar.txt b/simout/pentium_m/astar.txt
+deleted file mode 100644
+index f28a373..0000000
+--- a/simout/pentium_m/astar.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0    
+-  Instructions                     |    3932108
+-  Cycles                           |   17759253
+-  IPC                              |       0.22
+-  Time (ns)                        |    6676411
+-  Idle time (ns)                   |      -4275
+-  Idle time (%)                    |      -0.1%
+-Branch predictor stats             |           
+-  num correct                      |     447405
+-  num incorrect                    |      29603
+-  misprediction rate               |      6.21%
+-  mpki                             |       7.53
+-TLB Summary                        |           
+-Cache Summary                      |           
+-  Cache L1-I                       |           
+-    num cache accesses             |          0
+-    num cache misses               |          0
+-    miss rate                      |       inf%
+-    mpki                           |       0.00
+-  Cache L1-D                       |           
+-    num cache accesses             |    2365339
+-    num cache misses               |     146305
+-    miss rate                      |      6.19%
+-    mpki                           |      37.21
+-  Cache L2                         |           
+-    num cache accesses             |     146305
+-    num cache misses               |      86951
+-    miss rate                      |     59.43%
+-    mpki                           |      22.11
+-  Cache L3                         |           
+-    num cache accesses             |      86951
+-    num cache misses               |      85623
+-    miss rate                      |     98.47%
+-    mpki                           |      21.78
+-DRAM summary                       |           
+-  num dram accesses                |      85623
+-  average dram access latency (ns) |      56.39
+-  average dram queueing delay      |       0.00
+diff --git a/simout/pentium_m/bzip2out.txt b/simout/pentium_m/bzip2out.txt
+deleted file mode 100644
+index 81c435b..0000000
+--- a/simout/pentium_m/bzip2out.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0     
+-  Instructions                     |  1000000003
+-  Cycles                           |  1443875554
+-  IPC                              |        0.69
+-  Time (ns)                        |   542810359
+-  Idle time (ns)                   |        -159
+-  Idle time (%)                    |       -0.0%
+-Branch predictor stats             |            
+-  num correct                      |   120995786
+-  num incorrect                    |     6518190
+-  misprediction rate               |       5.11%
+-  mpki                             |        6.52
+-TLB Summary                        |            
+-Cache Summary                      |            
+-  Cache L1-I                       |            
+-    num cache accesses             |           0
+-    num cache misses               |           0
+-    miss rate                      |        inf%
+-    mpki                           |        0.00
+-  Cache L1-D                       |            
+-    num cache accesses             |   484819063
+-    num cache misses               |    14039182
+-    miss rate                      |       2.90%
+-    mpki                           |       14.04
+-  Cache L2                         |            
+-    num cache accesses             |    14039182
+-    num cache misses               |     8081214
+-    miss rate                      |      57.56%
+-    mpki                           |        8.08
+-  Cache L3                         |            
+-    num cache accesses             |     8081214
+-    num cache misses               |      140525
+-    miss rate                      |       1.74%
+-    mpki                           |        0.14
+-DRAM summary                       |            
+-  num dram accesses                |      140525
+-  average dram access latency (ns) |       56.39
+-  average dram queueing delay      |        0.00
+diff --git a/simout/pentium_m/gobmk.txt b/simout/pentium_m/gobmk.txt
+deleted file mode 100644
+index 321a857..0000000
+--- a/simout/pentium_m/gobmk.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0    
+-  Instructions                     |  100000001
+-  Cycles                           |  124920883
+-  IPC                              |       0.80
+-  Time (ns)                        |   46962738
+-  Idle time (ns)                   |       -515
+-  Idle time (%)                    |      -0.0%
+-Branch predictor stats             |           
+-  num correct                      |   12359871
+-  num incorrect                    |    1491590
+-  misprediction rate               |     10.77%
+-  mpki                             |      14.92
+-TLB Summary                        |           
+-Cache Summary                      |           
+-  Cache L1-I                       |           
+-    num cache accesses             |          0
+-    num cache misses               |          0
+-    miss rate                      |       inf%
+-    mpki                           |       0.00
+-  Cache L1-D                       |           
+-    num cache accesses             |   43190698
+-    num cache misses               |     289620
+-    miss rate                      |      0.67%
+-    mpki                           |       2.90
+-  Cache L2                         |           
+-    num cache accesses             |     289620
+-    num cache misses               |      10416
+-    miss rate                      |      3.60%
+-    mpki                           |       0.10
+-  Cache L3                         |           
+-    num cache accesses             |      10416
+-    num cache misses               |      10112
+-    miss rate                      |     97.08%
+-    mpki                           |       0.10
+-DRAM summary                       |           
+-  num dram accesses                |      10112
+-  average dram access latency (ns) |      56.39
+-  average dram queueing delay      |       0.00
+diff --git a/simout/pentium_m/mcfout.txt b/simout/pentium_m/mcfout.txt
+deleted file mode 100644
+index d57adc4..0000000
+--- a/simout/pentium_m/mcfout.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0     
+-  Instructions                     |  1000000001
+-  Cycles                           |  9727161410
+-  IPC                              |        0.10
+-  Time (ns)                        |  3656827598
+-  Idle time (ns)                   |       -2947
+-  Idle time (%)                    |       -0.0%
+-Branch predictor stats             |            
+-  num correct                      |   212305249
+-  num incorrect                    |     8600501
+-  misprediction rate               |       3.89%
+-  mpki                             |        8.60
+-TLB Summary                        |            
+-Cache Summary                      |            
+-  Cache L1-I                       |            
+-    num cache accesses             |           0
+-    num cache misses               |           0
+-    miss rate                      |        inf%
+-    mpki                           |        0.00
+-  Cache L1-D                       |            
+-    num cache accesses             |   413326688
+-    num cache misses               |   116125832
+-    miss rate                      |      28.10%
+-    mpki                           |      116.13
+-  Cache L2                         |            
+-    num cache accesses             |   116125832
+-    num cache misses               |    86797910
+-    miss rate                      |      74.74%
+-    mpki                           |       86.80
+-  Cache L3                         |            
+-    num cache accesses             |    86797910
+-    num cache misses               |    46129618
+-    miss rate                      |      53.15%
+-    mpki                           |       46.13
+-DRAM summary                       |            
+-  num dram accesses                |    46129618
+-  average dram access latency (ns) |       56.39
+-  average dram queueing delay      |        0.00
+diff --git a/simout/pentium_m/sjeng.txt b/simout/pentium_m/sjeng.txt
+deleted file mode 100644
+index c3f0c19..0000000
+--- a/simout/pentium_m/sjeng.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0    
+-  Instructions                     |  100000001
+-  Cycles                           |  120915483
+-  IPC                              |       0.83
+-  Time (ns)                        |   45456949
+-  Idle time (ns)                   |       -315
+-  Idle time (%)                    |      -0.0%
+-Branch predictor stats             |           
+-  num correct                      |   16358574
+-  num incorrect                    |    1111290
+-  misprediction rate               |      6.36%
+-  mpki                             |      11.11
+-TLB Summary                        |           
+-Cache Summary                      |           
+-  Cache L1-I                       |           
+-    num cache accesses             |          0
+-    num cache misses               |          0
+-    miss rate                      |       inf%
+-    mpki                           |       0.00
+-  Cache L1-D                       |           
+-    num cache accesses             |   31535255
+-    num cache misses               |     112536
+-    miss rate                      |      0.36%
+-    mpki                           |       1.13
+-  Cache L2                         |           
+-    num cache accesses             |     112536
+-    num cache misses               |      32951
+-    miss rate                      |     29.28%
+-    mpki                           |       0.33
+-  Cache L3                         |           
+-    num cache accesses             |      32951
+-    num cache misses               |      30339
+-    miss rate                      |     92.07%
+-    mpki                           |       0.30
+-DRAM summary                       |           
+-  num dram accesses                |      30339
+-  average dram access latency (ns) |      56.39
+-  average dram queueing delay      |       0.00
+diff --git a/simout/perceptron/astar.txt b/simout/perceptron/astar.txt
+deleted file mode 100644
+index 0632501..0000000
+--- a/simout/perceptron/astar.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0    
+-  Instructions                     |    3932108
+-  Cycles                           |   18316452
+-  IPC                              |       0.21
+-  Time (ns)                        |    6885884
+-  Idle time (ns)                   |      -4423
+-  Idle time (%)                    |      -0.1%
+-Branch predictor stats             |           
+-  num correct                      |     407577
+-  num incorrect                    |      69431
+-  misprediction rate               |     14.56%
+-  mpki                             |      17.66
+-TLB Summary                        |           
+-Cache Summary                      |           
+-  Cache L1-I                       |           
+-    num cache accesses             |          0
+-    num cache misses               |          0
+-    miss rate                      |       inf%
+-    mpki                           |       0.00
+-  Cache L1-D                       |           
+-    num cache accesses             |    2365339
+-    num cache misses               |     146305
+-    miss rate                      |      6.19%
+-    mpki                           |      37.21
+-  Cache L2                         |           
+-    num cache accesses             |     146305
+-    num cache misses               |      86951
+-    miss rate                      |     59.43%
+-    mpki                           |      22.11
+-  Cache L3                         |           
+-    num cache accesses             |      86951
+-    num cache misses               |      85623
+-    miss rate                      |     98.47%
+-    mpki                           |      21.78
+-DRAM summary                       |           
+-  num dram accesses                |      85623
+-  average dram access latency (ns) |      56.39
+-  average dram queueing delay      |       0.00
+diff --git a/simout/perceptron/gobmk.txt b/simout/perceptron/gobmk.txt
+deleted file mode 100644
+index 0d363de..0000000
+--- a/simout/perceptron/gobmk.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0    
+-  Instructions                     |  100000001
+-  Cycles                           |  138757234
+-  IPC                              |       0.72
+-  Time (ns)                        |   52164374
+-  Idle time (ns)                   |       -489
+-  Idle time (%)                    |      -0.0%
+-Branch predictor stats             |           
+-  num correct                      |   11371563
+-  num incorrect                    |    2479898
+-  misprediction rate               |     17.90%
+-  mpki                             |      24.80
+-TLB Summary                        |           
+-Cache Summary                      |           
+-  Cache L1-I                       |           
+-    num cache accesses             |          0
+-    num cache misses               |          0
+-    miss rate                      |       inf%
+-    mpki                           |       0.00
+-  Cache L1-D                       |           
+-    num cache accesses             |   43190698
+-    num cache misses               |     289620
+-    miss rate                      |      0.67%
+-    mpki                           |       2.90
+-  Cache L2                         |           
+-    num cache accesses             |     289620
+-    num cache misses               |      10416
+-    miss rate                      |      3.60%
+-    mpki                           |       0.10
+-  Cache L3                         |           
+-    num cache accesses             |      10416
+-    num cache misses               |      10112
+-    miss rate                      |     97.08%
+-    mpki                           |       0.10
+-DRAM summary                       |           
+-  num dram accesses                |      10112
+-  average dram access latency (ns) |      56.39
+-  average dram queueing delay      |       0.00
+diff --git a/simout/perceptron/sjeng.txt b/simout/perceptron/sjeng.txt
+deleted file mode 100644
+index b8d186c..0000000
+--- a/simout/perceptron/sjeng.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-                                   | Core 0    
+-  Instructions                     |  100000001
+-  Cycles                           |  141161425
+-  IPC                              |       0.71
+-  Time (ns)                        |   53068205
+-  Idle time (ns)                   |       -415
+-  Idle time (%)                    |      -0.0%
+-Branch predictor stats             |           
+-  num correct                      |   14912413
+-  num incorrect                    |    2557451
+-  misprediction rate               |     14.64%
+-  mpki                             |      25.57
+-TLB Summary                        |           
+-Cache Summary                      |           
+-  Cache L1-I                       |           
+-    num cache accesses             |          0
+-    num cache misses               |          0
+-    miss rate                      |       inf%
+-    mpki                           |       0.00
+-  Cache L1-D                       |           
+-    num cache accesses             |   31535255
+-    num cache misses               |     112536
+-    miss rate                      |      0.36%
+-    mpki                           |       1.13
+-  Cache L2                         |           
+-    num cache accesses             |     112536
+-    num cache misses               |      32951
+-    miss rate                      |     29.28%
+-    mpki                           |       0.33
+-  Cache L3                         |           
+-    num cache accesses             |      32951
+-    num cache misses               |      30339
+-    miss rate                      |     92.07%
+-    mpki                           |       0.30
+-DRAM summary                       |           
+-  num dram accesses                |      30339
+-  average dram access latency (ns) |      56.39
+-  average dram queueing delay      |       0.00
